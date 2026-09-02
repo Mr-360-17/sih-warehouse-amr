@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Warehouse AMR Fleet — Interactive Simulation | PS 26123</title>
+<style>
+  :root {
+    --bg: #0f1218;
+    --panel: #171b24;
+    --panel-2: #1e2330;
+    --border: #2a3040;
+    --border-strong: #3a4257;
+    --text: #e6e9f0;
+    --text-dim: #8891a3;
+    --idle: #4c8bf5;
+    --busy: #f2a93b;
+    --pickup: #34d399;
+    --dropoff: #f8717a;
+    --blocked: #3a3f4d;
+    --accent: #4c8bf5;
+    --mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    padding: 24px;
+  }
+
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+  }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 4px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  h1 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: 0.2px;
+  }
+
+  .subtitle {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin: 0 0 20px;
+  }
+
+  .ps-tag {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 20px;
+  }
+
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+
+  .canvas-panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+
+  canvas {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 6px;
+    cursor: crosshair;
+  }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+
+  button {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    padding: 7px 12px;
+    font-size: 13px;
+    font-family: var(--sans);
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+  }
+
+  button:hover { background: #262c3c; border-color: #4a5470; }
+  button:active { transform: scale(0.98); }
+
+  button.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #0a0e16;
+    font-weight: 600;
+  }
+
+  button.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #0a0e16;
+    font-weight: 600;
+  }
+
+  button.primary:hover { background: #6ba0f7; }
+
+  .mode-row, .play-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .tick-readout {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-left: auto;
+    white-space: nowrap;
+  }
+
+  .side {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+
+  .card h2 {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-dim);
+    margin: 0 0 10px;
+  }
+
+  .row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .row:last-child { margin-bottom: 0; }
+
+  .row label {
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  input[type="number"] {
+    width: 56px;
+    background: var(--panel-2);
+    border: 1px solid var(--border-strong);
+    border-radius: 5px;
+    color: var(--text);
+    padding: 5px 6px;
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+
+  input[type="range"] {
+    flex: 1;
+    accent-color: var(--accent);
+  }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .stat {
+    background: var(--panel-2);
+    border-radius: 6px;
+    padding: 10px;
+  }
+
+  .stat .num {
+    font-family: var(--mono);
+    font-size: 20px;
+    font-weight: 600;
+  }
+
+  .stat .label {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  .stat.idle .num { color: var(--idle); }
+  .stat.busy .num { color: var(--busy); }
+  .stat.done .num { color: var(--pickup); }
+  .stat.pending .num { color: var(--dropoff); }
+
+  .legend {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .legend .item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  .swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  .swatch.circle { border-radius: 50%; }
+
+  .hint {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  .footer-note {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 16px;
+    line-height: 1.6;
+  }
+
+  code {
+    font-family: var(--mono);
+    background: var(--panel-2);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 11px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Warehouse AMR fleet — interactive simulation</h1>
+    <span class="ps-tag">PS 26123 · Edge-AI Fleet Coordination</span>
+  </header>
+  <p class="subtitle">Spawn robots, queue tasks, add obstacles, and watch nearest-idle-robot assignment run tick by tick.</p>
+
+  <div class="layout">
+    <div class="canvas-panel">
+      <div class="toolbar">
+        <div class="play-row">
+          <button id="playBtn" class="primary">Play</button>
+          <button id="stepBtn">Step</button>
+          <button id="resetBtn">Reset</button>
+        </div>
+        <span class="tick-readout" id="tickReadout">tick 0</span>
+      </div>
+      <canvas id="gridCanvas" width="800" height="800"></canvas>
+      <div class="toolbar" style="margin-top:14px; margin-bottom:0;">
+        <div class="mode-row">
+          <button id="modeNone" class="active">Pan / view</button>
+          <button id="modeBlock">Add obstacle</button>
+          <button id="modeTask">Add task</button>
+        </div>
+      </div>
+      <p class="hint" id="modeHint" style="margin-top:10px;">Click cells to toggle obstacles, or add tasks — nothing selected right now.</p>
+    </div>
+
+    <div class="side">
+      <div class="card">
+        <h2>Fleet</h2>
+        <div class="row">
+          <label for="robotCount">Robot count</label>
+          <input type="number" id="robotCount" min="1" max="20" value="6">
+        </div>
+        <button id="spawnBtn" style="width:100%;">Respawn robots</button>
+      </div>
+
+      <div class="card">
+        <h2>Speed</h2>
+        <div class="row">
+          <input type="range" id="speedSlider" min="1" max="10" value="4">
+          <span class="tick-readout" id="speedReadout" style="margin-left:0;">4 ticks/s</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Live stats</h2>
+        <div class="stat-grid">
+          <div class="stat idle"><div class="num" id="statIdle">0</div><div class="label">Idle robots</div></div>
+          <div class="stat busy"><div class="num" id="statBusy">0</div><div class="label">Busy robots</div></div>
+          <div class="stat pending"><div class="num" id="statPending">0</div><div class="label">Pending tasks</div></div>
+          <div class="stat done"><div class="num" id="statDone">0</div><div class="label">Completed</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Legend</h2>
+        <div class="legend">
+          <div class="item"><span class="swatch circle" style="background:var(--idle);"></span>Idle robot</div>
+          <div class="item"><span class="swatch circle" style="background:var(--busy);"></span>Busy robot</div>
+          <div class="item"><span class="swatch" style="background:var(--pickup); clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);"></span>Task pickup</div>
+          <div class="item"><span class="swatch" style="background:var(--dropoff);"></span>Task dropoff</div>
+          <div class="item"><span class="swatch" style="background:var(--blocked);"></span>Blocked cell</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <button id="clearObstaclesBtn" style="width:100%; margin-bottom:8px;">Clear obstacles</button>
+        <button id="clearTasksBtn" style="width:100%;">Clear all tasks</button>
+      </div>
+    </div>
+  </div>
+
+  <p class="footer-note">
+    Movement here uses simple step-toward-target logic (avoids blocked cells only) as a stand-in for real pathfinding —
+    it mirrors <code>sim_robots.py</code>'s spawning, task queue, and nearest-idle-robot assignment logic, adapted for
+    the browser. Swap in the team's A* / reservation-table output once available for collision-accurate movement.
+  </p>
+</div>
+
+<script>
+(function () {
+  const GRID = 12;
+  const canvas = document.getElementById('gridCanvas');
+  const ctx = canvas.getContext('2d');
+  let cell = canvas.width / GRID;
+
+  let robots = [];
+  let tasks = [];
+  let blocked = new Set();
+  let nextTaskId = 0;
+  let nextRobotId = 0;
+  let tick = 0;
+  let playing = false;
+  let mode = 'none';
+  let pendingPickup = null;
+  let intervalHandle = null;
+
+  const key = (r, c) => r + ',' + c;
+
+  function isValid(r, c) {
+    return r >= 0 && r < GRID && c >= 0 && c < GRID && !blocked.has(key(r, c));
+  }
+
+  function manhattan(a, b) {
+    return Math.abs(a.r - b.r) + Math.abs(a.c - b.c);
+  }
+
+  function spawnRobots(n) {
+    robots = [];
+    const free = [];
+    for (let r = 0; r < GRID; r++) {
+      for (let c = 0; c < GRID; c++) {
+        if (isValid(r, c)) free.push({ r, c });
+      }
+    }
+    for (let i = free.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [free[i], free[j]] = [free[j], free[i]];
+    }
+    n = Math.min(n, free.length);
+    for (let i = 0; i < n; i++) {
+      robots.push({
+        id: nextRobotId++,
+        r: free[i].r,
+        c: free[i].c,
+        status: 'idle',
+        taskId: null,
+        phase: null,
+      });
+    }
+  }
+
+  function addTask(pickup, dropoff) {
+    tasks.push({
+      id: nextTaskId++,
+      pickup, dropoff,
+      status: 'pending',
+      assignedRobot: null,
+    });
+  }
+
+  function findNearestIdle(target) {
+    let best = null, bestDist = Infinity;
+    for (const r of robots) {
+      if (r.status !== 'idle') continue;
+      const d = manhattan(r, target);
+      if (d < bestDist) { bestDist = d; best = r; }
+    }
+    return best;
+  }
+
+  function assignTasks() {
+    for (const t of tasks) {
+      if (t.status !== 'pending') continue;
+      const robot = findNearestIdle(t.pickup);
+      if (!robot) continue;
+      robot.status = 'busy';
+      robot.taskId = t.id;
+      robot.phase = 'to_pickup';
+      t.status = 'assigned';
+      t.assignedRobot = robot.id;
+    }
+  }
+
+  function stepTowards(pos, target) {
+    if (pos.r === target.r && pos.c === target.c) return pos;
+    const candidates = [];
+    const dr = target.r - pos.r, dc = target.c - pos.c;
+    if (dr !== 0) candidates.push({ r: pos.r + Math.sign(dr), c: pos.c });
+    if (dc !== 0) candidates.push({ r: pos.r, c: pos.c + Math.sign(dc) });
+    for (const cand of candidates) {
+      if (isValid(cand.r, cand.c)) return cand;
+    }
+    return pos;
+  }
+
+  function simulationStep() {
+    for (const robot of robots) {
+      if (robot.status !== 'busy' || robot.taskId === null) continue;
+      const task = tasks.find(t => t.id === robot.taskId);
+      if (!task) continue;
+      const target = robot.phase === 'to_pickup' ? task.pickup : task.dropoff;
+      const next = stepTowards({ r: robot.r, c: robot.c }, target);
+      robot.r = next.r; robot.c = next.c;
+
+      if (robot.r === target.r && robot.c === target.c) {
+        if (robot.phase === 'to_pickup') {
+          robot.phase = 'to_dropoff';
+        } else {
+          task.status = 'completed';
+          robot.status = 'idle';
+          robot.taskId = null;
+          robot.phase = null;
+        }
+      }
+    }
+    assignTasks();
+    tick++;
+    updateStats();
+    draw();
+  }
+
+  function updateStats() {
+    const idle = robots.filter(r => r.status === 'idle').length;
+    const busy = robots.filter(r => r.status === 'busy').length;
+    const pending = tasks.filter(t => t.status === 'pending' || t.status === 'assigned').length;
+    const done = tasks.filter(t => t.status === 'completed').length;
+    document.getElementById('statIdle').textContent = idle;
+    document.getElementById('statBusy').textContent = busy;
+    document.getElementById('statPending').textContent = pending;
+    document.getElementById('statDone').textContent = done;
+    document.getElementById('tickReadout').textContent = 'tick ' + tick;
+  }
+
+  function drawStar(cx, cy, r, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const rad = i % 2 === 0 ? r : r * 0.45;
+      const angle = (Math.PI / 5) * i - Math.PI / 2;
+      const x = cx + rad * Math.cos(angle);
+      const y = cy + rad * Math.sin(angle);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = '#0c0f16';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    for (const k of blocked) {
+      const [r, c] = k.split(',').map(Number);
+      ctx.fillStyle = 'rgba(58,63,77,0.9)';
+      ctx.fillRect(c * cell, r * cell, cell, cell);
+    }
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= GRID; i++) {
+      ctx.beginPath(); ctx.moveTo(i * cell, 0); ctx.lineTo(i * cell, canvas.height); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, i * cell); ctx.lineTo(canvas.width, i * cell); ctx.stroke();
+    }
+
+    if (pendingPickup) {
+      ctx.strokeStyle = '#34d399';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(pendingPickup.c * cell + 2, pendingPickup.r * cell + 2, cell - 4, cell - 4);
+    }
+
+    for (const t of tasks) {
+      if (t.status === 'completed') continue;
+      drawStar(t.pickup.c * cell + cell / 2, t.pickup.r * cell + cell / 2, cell * 0.28, '#34d399');
+      ctx.fillStyle = '#f8717a';
+      const s = cell * 0.32;
+      ctx.fillRect(t.dropoff.c * cell + cell / 2 - s / 2, t.dropoff.r * cell + cell / 2 - s / 2, s, s);
+
+      if (t.assignedRobot !== null) {
+        const robot = robots.find(r => r.id === t.assignedRobot);
+        if (robot) {
+          ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 4]);
+          ctx.beginPath();
+          ctx.moveTo(robot.c * cell + cell / 2, robot.r * cell + cell / 2);
+          ctx.lineTo(t.pickup.c * cell + cell / 2, t.pickup.r * cell + cell / 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+      }
+    }
+
+    for (const r of robots) {
+      const cx = r.c * cell + cell / 2, cy = r.r * cell + cell / 2;
+      ctx.fillStyle = r.status === 'idle' ? '#4c8bf5' : '#f2a93b';
+      ctx.beginPath();
+      ctx.arc(cx, cy, cell * 0.34, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#0c0f16';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.fillStyle = '#0a0e16';
+      ctx.font = '600 ' + Math.round(cell * 0.32) + 'px ui-monospace, monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(r.id, cx, cy + 1);
+    }
+  }
+
+  function resizeCanvas() {
+    const displaySize = canvas.parentElement.clientWidth - 32;
+    const size = Math.min(800, Math.max(320, displaySize));
+    canvas.width = size;
+    canvas.height = size;
+    cell = canvas.width / GRID;
+    draw();
+  }
+
+  canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+    const c = Math.floor(x / cell);
+    const r = Math.floor(y / cell);
+    if (r < 0 || r >= GRID || c < 0 || c >= GRID) return;
+
+    if (mode === 'block') {
+      const occupied = robots.some(ro => ro.r === r && ro.c === c);
+      if (occupied) return;
+      const k = key(r, c);
+      blocked.has(k) ? blocked.delete(k) : blocked.add(k);
+      draw();
+    } else if (mode === 'task') {
+      if (blocked.has(key(r, c))) return;
+      if (!pendingPickup) {
+        pendingPickup = { r, c };
+        document.getElementById('modeHint').textContent = 'Pickup set at (' + r + ',' + c + ') — click a dropoff cell.';
+        draw();
+      } else {
+        addTask(pendingPickup, { r, c });
+        pendingPickup = null;
+        document.getElementById('modeHint').textContent = 'Task added. Click a pickup cell to add another.';
+        updateStats();
+        draw();
+      }
+    }
+  });
+
+  function setMode(newMode) {
+    mode = newMode;
+    pendingPickup = null;
+    document.querySelectorAll('.mode-row button').forEach(b => b.classList.remove('active'));
+    const hints = {
+      none: 'Click cells to toggle obstacles, or add tasks — nothing selected right now.',
+      block: 'Click any empty cell to toggle it as a blocked obstacle.',
+      task: 'Click a cell for pickup, then a second cell for dropoff.',
+    };
+    document.getElementById('modeHint').textContent = hints[newMode];
+    document.getElementById({ none: 'modeNone', block: 'modeBlock', task: 'modeTask' }[newMode]).classList.add('active');
+    draw();
+  }
+
+  document.getElementById('modeNone').onclick = () => setMode('none');
+  document.getElementById('modeBlock').onclick = () => setMode('block');
+  document.getElementById('modeTask').onclick = () => setMode('task');
+
+  document.getElementById('spawnBtn').onclick = () => {
+    const n = parseInt(document.getElementById('robotCount').value, 10) || 6;
+    spawnRobots(n);
+    updateStats();
+    draw();
+  };
+
+  document.getElementById('clearObstaclesBtn').onclick = () => {
+    blocked.clear();
+    draw();
+  };
+
+  document.getElementById('clearTasksBtn').onclick = () => {
+    tasks = [];
+    for (const r of robots) { r.status = 'idle'; r.taskId = null; r.phase = null; }
+    updateStats();
+    draw();
+  };
+
+  document.getElementById('stepBtn').onclick = () => simulationStep();
+
+  document.getElementById('resetBtn').onclick = () => {
+    stopPlaying();
+    tick = 0;
+    blocked = new Set(['3,3', '3,4', '5,5', '5,6', '8,7']);
+    tasks = [];
+    nextTaskId = 0;
+    spawnRobots(parseInt(document.getElementById('robotCount').value, 10) || 6);
+    addTask({ r: 1, c: 1 }, { r: 9, c: 9 });
+    addTask({ r: 10, c: 1 }, { r: 1, c: 10 });
+    addTask({ r: 4, c: 6 }, { r: 2, c: 9 });
+    assignTasks();
+    updateStats();
+    draw();
+  };
+
+  let speed = 4;
+  function startPlaying() {
+    playing = true;
+    document.getElementById('playBtn').textContent = 'Pause';
+    intervalHandle = setInterval(simulationStep, 1000 / speed);
+  }
+  function stopPlaying() {
+    playing = false;
+    document.getElementById('playBtn').textContent = 'Play';
+    if (intervalHandle) clearInterval(intervalHandle);
+  }
+  document.getElementById('playBtn').onclick = () => {
+    playing ? stopPlaying() : startPlaying();
+  };
+
+  document.getElementById('speedSlider').addEventListener('input', (e) => {
+    speed = parseInt(e.target.value, 10);
+    document.getElementById('speedReadout').textContent = speed + ' ticks/s';
+    if (playing) { stopPlaying(); startPlaying(); }
+  });
+
+  window.addEventListener('resize', resizeCanvas);
+
+  document.getElementById('resetBtn').click();
+  resizeCanvas();
+})();
+</script>
+</body>
+</html>
