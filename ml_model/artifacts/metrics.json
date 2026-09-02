@@ -1,0 +1,14 @@
+{
+  "rows": 1000,
+  "test_rows": 200,
+  "seed": 42,
+  "hidden_layer_sizes": [
+    6
+  ],
+  "accuracy": 0.43,
+  "theoretical_ceiling": 0.425,
+  "random_baseline": 0.25,
+  "busy_hour_accuracy": 0.7568,
+  "quiet_hour_accuracy": 0.2381,
+  "iterations": 439
+}

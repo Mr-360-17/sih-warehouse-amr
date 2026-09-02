@@ -1,5 +1,12 @@
 import random
 import csv
+
+# Fixed seed so the dataset is reproducible. Anyone who clones this repo and
+# runs this script gets byte-identical data, which is what makes the accuracy
+# figures reported by train_mlp.py checkable rather than just claimed.
+SEED = 42
+random.seed(SEED)
+
 zones = ["A", "B", "C", "D"]
 
 # hours (24-hour format) when each zone tends to get busy
